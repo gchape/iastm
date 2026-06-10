@@ -1,0 +1,23 @@
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.mvn/
+dependency-reduced-pom.xml
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
