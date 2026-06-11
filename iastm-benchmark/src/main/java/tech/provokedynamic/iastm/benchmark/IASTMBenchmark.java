@@ -9,6 +9,21 @@ import tech.provokedynamic.iastm.atomic.TVar;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+/// JMH benchmark suite for the IASTM runtime.
+///
+/// Measures throughput (operations/second) across the two main workload archetypes:
+///
+/// - **Bank transfer** — two-variable read-modify-write under varying thread counts
+///   and both [IASTM.Strategy#OPTIMISTIC] and [IASTM.Strategy#PESSIMISTIC] strategies
+/// - **Multi-read** — pure read-only transactions that observe two adjacent accounts
+/// - **Mixed read-heavy** — 8 reads + 1 write per transaction, exercising strategy
+///   selection via an explicit [TxMetrics] hint
+///
+/// Baseline benchmarks isolate single-threaded read and increment costs to
+/// separate framework overhead from contention effects.
+///
+/// Setup: 64 account `TVar`s each initialised to 100 000, re-created fresh at
+/// the start of every measurement iteration to avoid state accumulation across runs.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 3, time = 1)
@@ -18,14 +33,26 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("unused")
 public class IASTMBenchmark {
 
+    /// Metrics hint representing a read-heavy workload (90 % reads, 10 % writes).
+    /// Passed to [IASTM#start(Runnable, TxMetrics)] to force [IASTM.Strategy#OPTIMISTIC].
     private static final TxMetrics READ_HEAVY = new TxMetrics(9, 1);
+
+    /// Metrics hint representing a write-heavy workload (10 % reads, 90 % writes).
+    /// Passed to [IASTM#start(Runnable, TxMetrics)] to force [IASTM.Strategy#PESSIMISTIC].
     private static final TxMetrics WRITE_HEAVY = new TxMetrics(1, 9);
 
+    /// Number of simulated bank accounts. A power-of-two-friendly value that
+    /// provides enough variables to spread contention across threads.
     private static final int ACCOUNT_COUNT = 64;
 
+    /// Shared counter used by single-threaded baseline benchmarks.
     private TVar<Integer> counter;
+
+    /// Array of account `TVar`s used by transfer and multi-read benchmarks.
     private TVar<Integer>[] accounts;
 
+    /// Reinitialises all shared state before each measurement iteration to prevent
+    /// counter overflow or balance depletion from affecting timing results.
     @SuppressWarnings("unchecked")
     @Setup(Level.Iteration)
     public void setup() {
@@ -36,6 +63,8 @@ public class IASTMBenchmark {
         }
     }
 
+    /// Baseline: single-threaded read of a single `TVar` with no contention.
+    /// Establishes the minimum per-transaction overhead.
     @Benchmark
     @Threads(1)
     public void baseline_read_1t(Blackhole bh) {
@@ -44,60 +73,74 @@ public class IASTMBenchmark {
         bh.consume(v[0]);
     }
 
+    /// Baseline: single-threaded read-modify-write of a single `TVar`.
+    /// Isolates commit cost without any inter-thread conflict.
     @Benchmark
     @Threads(1)
     public void baseline_increment_1t() {
         IASTM.start(() -> IASTM.write(counter, IASTM.read(counter) + 1));
     }
 
+    /// Pessimistic bank transfer under 4-thread contention.
     @Benchmark
     @Threads(4)
     public void bankTransfer_pessimistic_4t() {
         transfer(true);
     }
 
+    /// Pessimistic bank transfer under 8-thread contention.
     @Benchmark
     @Threads(8)
     public void bankTransfer_pessimistic_8t() {
         transfer(true);
     }
 
+    /// Optimistic multi-read under 4-thread contention.
     @Benchmark
     @Threads(4)
     public void multiRead_optimistic_4t(Blackhole bh) {
         multiRead(bh);
     }
 
+    /// Optimistic multi-read under 8-thread contention.
     @Benchmark
     @Threads(8)
     public void multiRead_optimistic_8t(Blackhole bh) {
         multiRead(bh);
     }
 
+    /// Optimistic bank transfer under 4-thread contention.
     @Benchmark
     @Threads(4)
     public void bankTransfer_optimistic_4t() {
         transfer(false);
     }
 
+    /// Optimistic bank transfer under 8-thread contention.
     @Benchmark
     @Threads(8)
     public void bankTransfer_optimistic_8t() {
         transfer(false);
     }
 
+    /// Mixed read-heavy workload (8 reads + 1 write) under 4-thread contention.
+    /// Uses an explicit [#READ_HEAVY] metrics hint to select the optimistic strategy.
     @Benchmark
     @Threads(4)
     public void mixed_readHeavy_4t(Blackhole bh) {
         mixed(bh);
     }
 
+    /// Mixed read-heavy workload (8 reads + 1 write) under 8-thread contention.
     @Benchmark
     @Threads(8)
     public void mixed_readHeavy_8t(Blackhole bh) {
         mixed(bh);
     }
 
+    /// Reads two adjacent accounts and sums their balances in a single snapshot
+    /// transaction. The pair is chosen randomly to distribute read-set overlap
+    /// across threads.
     private void multiRead(Blackhole bh) {
         int idx = ThreadLocalRandom.current().nextInt(ACCOUNT_COUNT);
         TVar<Integer> a = accounts[idx];
@@ -107,6 +150,9 @@ public class IASTMBenchmark {
         bh.consume(sum[0]);
     }
 
+    /// Reads 8 consecutive accounts, then increments a single "sink" account on
+    /// the opposite side of the array. Passes [#READ_HEAVY] to bias strategy
+    /// selection towards optimistic.
     private void mixed(Blackhole bh) {
         int idx = ThreadLocalRandom.current().nextInt(ACCOUNT_COUNT);
         int[] out = new int[1];
@@ -122,6 +168,13 @@ public class IASTMBenchmark {
         bh.consume(out[0]);
     }
 
+    /// Transfers 1 unit from a randomly chosen source account to a distinct
+    /// destination account. The transfer is skipped if the source balance is zero
+    /// to prevent negative balances. Strategy is selected via `pessimistic` flag.
+    ///
+    /// @param pessimistic if `true`, passes [#WRITE_HEAVY] metrics to force
+    ///                    [IASTM.Strategy#PESSIMISTIC]; otherwise uses the default
+    ///                    optimistic strategy
     private void transfer(boolean pessimistic) {
         ThreadLocalRandom rng = ThreadLocalRandom.current();
         int from = rng.nextInt(ACCOUNT_COUNT);
