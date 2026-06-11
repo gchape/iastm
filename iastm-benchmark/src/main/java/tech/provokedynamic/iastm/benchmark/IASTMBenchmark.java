@@ -9,21 +9,6 @@ import tech.provokedynamic.iastm.atomic.TVar;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
-/// JMH benchmark suite for the IASTM runtime.
-///
-/// Measures throughput (operations/second) across the two main workload archetypes:
-///
-/// - **Bank transfer** — two-variable read-modify-write under varying thread counts
-///   and both [IASTM.Strategy#OPTIMISTIC] and [IASTM.Strategy#PESSIMISTIC] strategies
-/// - **Multi-read** — pure read-only transactions that observe two adjacent accounts
-/// - **Mixed read-heavy** — 8 reads + 1 write per transaction, exercising strategy
-///   selection via an explicit [TxMetrics] hint
-///
-/// Baseline benchmarks isolate single-threaded read and increment costs to
-/// separate framework overhead from contention effects.
-///
-/// Setup: 64 account `TVar`s each initialised to 100 000, re-created fresh at
-/// the start of every measurement iteration to avoid state accumulation across runs.
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @Warmup(iterations = 3, time = 1)
@@ -51,7 +36,7 @@ public class IASTMBenchmark {
     /// Array of account `TVar`s used by transfer and multi-read benchmarks.
     private TVar<Integer>[] accounts;
 
-    /// Reinitialises all shared state before each measurement iteration to prevent
+    /// Reinitialize all shared state before each measurement iteration to prevent
     /// counter overflow or balance depletion from affecting timing results.
     @SuppressWarnings("unchecked")
     @Setup(Level.Iteration)

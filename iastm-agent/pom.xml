@@ -15,9 +15,13 @@
 
     <dependencies>
         <dependency>
-            <groupId>tech.provokedynamic</groupId>
-            <artifactId>iastm-core</artifactId>
-            <scope>provided</scope>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>

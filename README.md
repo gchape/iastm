@@ -15,7 +15,7 @@ Your code                       After agent transform
 IASTM.start(() -> {         →   IASTM.start(() -> {
     int v = IASTM.read(x);          int v = IASTM.read(x);       // readOps=1
     IASTM.write(x, v + 1);          IASTM.write(x, v + 1);       // writeOps=1
-});                             }, new TxMetrics(1, 1));         // injected
+});                             }, new TxMetrics(1, 1));          // injected ✓
 ```
 
 The agent counts `IASTM.read` / `IASTM.write` calls in the lambda body at class-load time
@@ -62,9 +62,11 @@ java --enable-preview \
 IASTMAgent.attach(null); // instrument default prefix
 
 TVar<Integer> counter = new TVar<>(0);
+IASTM.
 
-IASTM.start(() ->
-    IASTM.write(counter, IASTM.read(counter) + 1));
+start(() ->IASTM.
+
+write(counter, IASTM.read(counter) +1));
 ```
 
 ### Custom scan prefix
