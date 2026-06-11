@@ -14,14 +14,12 @@
     <name>IASTM Agent</name>
 
     <dependencies>
-        <!-- Core is provided — not bundled into the agent fat JAR -->
         <dependency>
             <groupId>tech.provokedynamic</groupId>
             <artifactId>iastm-core</artifactId>
             <scope>provided</scope>
         </dependency>
 
-        <!-- ByteBuddy for self-attach in programmatic/test mode -->
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy-agent</artifactId>
@@ -35,7 +33,6 @@
                 <artifactId>maven-compiler-plugin</artifactId>
             </plugin>
 
-            <!-- Agent fat JAR with MANIFEST entries and shaded ByteBuddy -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -70,7 +67,6 @@
                                     </excludes>
                                 </filter>
                             </filters>
-                            <!-- Shade ByteBuddy to avoid classpath conflicts -->
                             <relocations>
                                 <relocation>
                                     <pattern>net.bytebuddy</pattern>
