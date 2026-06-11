@@ -4,14 +4,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public enum TxClock {
     INSTANCE;
-
-    private final AtomicLong version = new AtomicLong(0L);
+    private final AtomicLong global = new AtomicLong(0L);
 
     public long current() {
-        return version.get();
+        return global.get();
     }
 
     public long next() {
-        return version.incrementAndGet();
+        return global.incrementAndGet();
     }
 }

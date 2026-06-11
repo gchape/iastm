@@ -13,9 +13,9 @@ public final class AdaptiveBackoff {
 
     private static final int JITTER_MS = 5;
 
-    private static final int SPIN_THRESHOLD = 3;
+    private static final int SPIN_THRESHOLD = 8;
 
-    private static final int SHORT_THRESHOLD = 7;
+    private static final int SHORT_THRESHOLD = 14;
     private static final long SHORT_BASE_MS = 1L;
     private static final long SHORT_MAX_MS = 16L;
 

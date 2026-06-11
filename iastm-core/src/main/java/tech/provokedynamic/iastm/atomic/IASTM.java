@@ -22,17 +22,12 @@ public class IASTM {
     private static final double READ_HEAVY_THRESHOLD = 0.80;
     private static final double WRITE_HEAVY_THRESHOLD = 0.60;
 
-    /// Starts a transaction with automatically-selected strategy.
-    /// The agent upgrades this call site to [#start(Runnable, TxMetrics)] at load time.
     public static void start(Runnable body) {
-        Strategy inherited = __STRATEGY.isBound() ? __STRATEGY.get() : Strategy.OPTIMISTIC;
-        ScopedValue.where(__STRATEGY, inherited)
+        ScopedValue.where(__STRATEGY, __STRATEGY.isBound() ? __STRATEGY.get() : Strategy.OPTIMISTIC)
                 .where(__BACKOFF, new AdaptiveBackoff())
                 .run(() -> run(body));
     }
 
-    /// Starts a transaction using the strategy selected from the supplied metrics.
-    /// This overload is the target for agent-rewritten call sites.
     @SuppressWarnings("unused")
     public static void start(Runnable body, TxMetrics metrics) {
         ScopedValue.where(__STRATEGY, selectStrategy(metrics))
@@ -40,17 +35,11 @@ public class IASTM {
                 .run(() -> run(body));
     }
 
-    /// Reads the current value of `tVar` within the active transaction.
-    ///
-    /// @throws IllegalStateException if called outside a transaction
     public static <T> T read(TVar<T> tVar) {
         __TX.orElseThrow(() -> new IllegalStateException("No active transaction"));
         return tVar.read(__TX.get().readPoint);
     }
 
-    /// Writes `value` to `tVar` within the active transaction.
-    ///
-    /// @throws IllegalStateException if called outside a transaction
     public static <T> void write(TVar<T> tVar, T value) {
         __TX.orElseThrow(() -> new IllegalStateException("No active transaction"));
         tVar.write(value);
@@ -82,11 +71,17 @@ public class IASTM {
     }
 
     private static Strategy selectStrategy(TxMetrics metrics) {
-        if (metrics.totalOps() == 0) return Strategy.OPTIMISTIC;
+        if (metrics.totalOps() == 0) {
+            return Strategy.OPTIMISTIC;
+        }
         double readRatio = (double) metrics.readOps() / metrics.totalOps();
         double writeRatio = (double) metrics.writeOps() / metrics.totalOps();
-        if (readRatio >= READ_HEAVY_THRESHOLD) return Strategy.OPTIMISTIC;
-        if (writeRatio >= WRITE_HEAVY_THRESHOLD) return Strategy.PESSIMISTIC;
+        if (readRatio >= READ_HEAVY_THRESHOLD) {
+            return Strategy.OPTIMISTIC;
+        }
+        if (writeRatio >= WRITE_HEAVY_THRESHOLD) {
+            return Strategy.PESSIMISTIC;
+        }
         return Strategy.OPTIMISTIC;
     }
 
