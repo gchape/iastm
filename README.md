@@ -1,5 +1,7 @@
 # IASTM — Instrumented Adaptive Software Transactional Memory
 
+<img width="1440" height="520" alt="image" src="https://github.com/user-attachments/assets/3da23af7-4b8f-41bc-b756-e036e40705e1" />
+
 A JVM-native STM library for Java 25 that uses a **bytecode-instrumentation agent** to
 automatically inject read/write metrics at load time, enabling **adaptive
 optimistic/pessimistic concurrency strategy selection** at runtime — with zero boilerplate
@@ -13,7 +15,7 @@ Your code                       After agent transform
 IASTM.start(() -> {         →   IASTM.start(() -> {
     int v = IASTM.read(x);          int v = IASTM.read(x);       // readOps=1
     IASTM.write(x, v + 1);          IASTM.write(x, v + 1);       // writeOps=1
-});                             }, new TxMetrics(1, 1));          // injected ✓
+});                             }, new TxMetrics(1, 1));         // injected
 ```
 
 The agent counts `IASTM.read` / `IASTM.write` calls in the lambda body at class-load time
@@ -60,11 +62,9 @@ java --enable-preview \
 IASTMAgent.attach(null); // instrument default prefix
 
 TVar<Integer> counter = new TVar<>(0);
-IASTM.
 
-start(() ->IASTM.
-
-write(counter, IASTM.read(counter) +1));
+IASTM.start(() ->
+    IASTM.write(counter, IASTM.read(counter) + 1));
 ```
 
 ### Custom scan prefix
