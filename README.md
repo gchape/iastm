@@ -1,5 +1,7 @@
 # IASTM — Instrumented Adaptive Software Transactional Memory
 
+<img width="300" height="115" alt="iastm_logo_v15" src="https://github.com/user-attachments/assets/b63689c6-c583-498f-bd15-193c888f4afa" />
+
 A JVM-native STM library for Java 25 that uses a **bytecode-instrumentation agent** to
 automatically inject read/write metrics at class-load time, enabling **adaptive
 optimistic/pessimistic concurrency strategy selection** at runtime — with zero boilerplate
