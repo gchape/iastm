@@ -350,18 +350,18 @@ variables to spread contention across threads while keeping conflict rates measu
 **Results** — JDK 25.0.3, OpenJDK 64-Bit Server VM, AMD Ryzen 5 7535HS (12 threads) @ 4.60 GHz.
 Throughput in ops/s, higher is better.
 
-| Benchmark                     | Threads | ops/s      | Error       |
-|-------------------------------|---------|------------|-------------|
-| `baseline_read_1t`            | 1       | 11,103,518 | ± 223,830   |
-| `baseline_increment_1t`       | 1       | 7,147,136  | ± 253,218   |
-| `multiRead_optimistic_4t`     | 4       | 24,775,405 | ± 1,773,964 |
-| `multiRead_optimistic_8t`     | 8       | 31,252,384 | ± 3,842,396 |
-| `bankTransfer_optimistic_4t`  | 4       | 4,281,955  | ± 156,278   |
-| `bankTransfer_optimistic_8t`  | 8       | 3,785,275  | ± 56,655    |
-| `bankTransfer_pessimistic_4t` | 4       | 6,456,801  | ± 348,298   |
-| `bankTransfer_pessimistic_8t` | 8       | 6,423,554  | ± 690,132   |
-| `mixed_readHeavy_4t`          | 4       | 4,288,779  | ± 280,226   |
-| `mixed_readHeavy_8t`          | 8       | 4,573,934  | ± 219,983   |
+| Benchmark                     | Threads | ops/s      | Error        |
+|-------------------------------|---------|------------|--------------|
+| `baseline_read_1t`            | 1       | 10,893,427 | ± 181,686    |
+| `baseline_increment_1t`       | 1       | 7,311,142  | ± 434,885    |
+| `multiRead_optimistic_4t`     | 4       | 28,759,901 | ± 12,543,127 |
+| `multiRead_optimistic_8t`     | 8       | 38,720,213 | ± 6,727,568  |
+| `bankTransfer_optimistic_4t`  | 4       | 4,899,352  | ± 1,137,914  |
+| `bankTransfer_optimistic_8t`  | 8       | 5,671,968  | ± 511,144    |
+| `bankTransfer_pessimistic_4t` | 4       | 6,106,656  | ± 839,891    |
+| `bankTransfer_pessimistic_8t` | 8       | 7,401,965  | ± 397,720    |
+| `mixed_readHeavy_4t`          | 4       | 3,228,018  | ± 202,870    |
+| `mixed_readHeavy_8t`          | 8       | 3,162,629  | ± 171,668    |
 
 **`multiRead`** scales past 8 threads because reads are non-contending MVCC snapshots —
 each thread scans its own `readPoint` without acquiring any lock.

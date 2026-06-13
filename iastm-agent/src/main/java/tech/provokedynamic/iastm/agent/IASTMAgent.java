@@ -1,8 +1,6 @@
 package tech.provokedynamic.iastm.agent;
 
 import net.bytebuddy.agent.ByteBuddyAgent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.instrument.Instrumentation;
 import java.util.Arrays;
@@ -24,8 +22,6 @@ import java.util.stream.Collectors;
 /// - **Dynamic** — attached to a running JVM via [#agentmain]
 /// - **Programmatic** — [#attach(String)] for in-process use in tests
 public final class IASTMAgent {
-
-    private static final Logger log = LoggerFactory.getLogger(IASTMAgent.class);
 
     private static final String AGENT_INTERNAL_PREFIX = "tech/provokedynamic/iastm/agent/";
 
@@ -91,7 +87,6 @@ public final class IASTMAgent {
         Set<String> scanPrefixes = parsePrefixes(args);
         inst.addTransformer(new IASTMTransformer(scanPrefixes), true);
         retransformLoadedClasses(inst, scanPrefixes);
-        log.info("IASTM Agent ready, prefixes: {}", scanPrefixes);
     }
 
     /// Iterates all classes currently loaded by the JVM and retransforms those that fall
@@ -108,8 +103,7 @@ public final class IASTMAgent {
                 .forEach(c -> {
                     try {
                         inst.retransformClasses(c);
-                    } catch (Exception e) {
-                        log.warn("Retransform skipped for {}: {}", c.getName(), e.getMessage());
+                    } catch (Exception _) {
                     }
                 });
     }

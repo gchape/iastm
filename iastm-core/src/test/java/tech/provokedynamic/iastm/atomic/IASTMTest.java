@@ -47,7 +47,7 @@ class IASTMTest {
                 // inside the tx, read sees the buffered value
                 assertThat(IASTM.read(v)).isEqualTo(99); // no; read-set returns live value
             });
-            // after commit it should be 99
+            // after commit, it should be 99
             assertThat(v.value).isEqualTo(99);
         }
 

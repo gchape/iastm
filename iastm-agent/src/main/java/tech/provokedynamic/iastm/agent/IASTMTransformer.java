@@ -1,8 +1,5 @@
 package tech.provokedynamic.iastm.agent;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.lang.classfile.*;
 import java.lang.classfile.instruction.InvokeDynamicInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
@@ -31,8 +28,6 @@ import java.util.*;
 /// are never transformed. If a class contains no plain `IASTM.start` call sites the
 /// transformer returns `null` (no-op).
 public final class IASTMTransformer implements ClassFileTransformer {
-
-    private static final Logger log = LoggerFactory.getLogger(IASTMTransformer.class);
 
     private static final ClassDesc CD_IASTM = ClassDesc.of("tech.provokedynamic.iastm.atomic.IASTM");
     private static final ClassDesc CD_TX_METRICS = ClassDesc.of("tech.provokedynamic.iastm.TxMetrics");
@@ -83,7 +78,7 @@ public final class IASTMTransformer implements ClassFileTransformer {
                         && inv.owner().asSymbol().equals(CD_IASTM)) {
 
                     switch (inv.name().stringValue()) {
-                        case "read"  -> counts[0]++;
+                        case "read" -> counts[0]++;
                         case "write" -> counts[1]++;
                         case "start" -> {
                             if (inv.typeSymbol().equals(MTD_START_PLAIN)) {
@@ -172,7 +167,6 @@ public final class IASTMTransformer implements ClassFileTransformer {
                                             new MetricsInjectingTransform(resolved)))));
 
         } catch (Exception e) {
-            log.error("Transformation failed for {}: {}", className, e.getMessage(), e);
             return null;
         }
     }
@@ -211,8 +205,6 @@ public final class IASTMTransformer implements ClassFileTransformer {
                     && pendingLambda != null) {
 
                 int[] counts = resolved.getOrDefault(pendingLambda, new int[]{0, 0});
-                log.info("Rewriting IASTM.start for lambda [{}]: readOps={}, writeOps={}",
-                        pendingLambda, counts[0], counts[1]);
                 pendingLambda = null;
 
                 cb.new_(CD_TX_METRICS)

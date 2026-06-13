@@ -4,8 +4,9 @@ import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import tech.provokedynamic.iastm.clock.TxClock;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.*;
 
 import static tech.provokedynamic.iastm.atomic.IASTM.__STRATEGY;
@@ -18,7 +19,7 @@ public final class Tx implements Comparable<Tx> {
     /// The global clock value sampled when this transaction attempt was created.
     /// All snapshot reads use this timestamp to select a consistent version from
     /// each [TVar]'s [tech.provokedynamic.iastm.mvcc.VersionHistory].
-    final long readPoint = TxClock.INSTANCE.current();
+    final long readPoint = Clock.INSTANCE.now();
 
     /// Read-set: maps each [TVar] to the version observed during the read.
     /// Used by [#validateReads()] to detect concurrent writes before commit.
@@ -112,7 +113,7 @@ public final class Tx implements Comparable<Tx> {
 
     @SuppressWarnings("unchecked")
     private void applyWrites() {
-        long version = TxClock.INSTANCE.next();
+        long version = Clock.INSTANCE.advance();
         log.debug("applying writes commitVersion={} count={} strategy={}",
                 version, ws.size(), __STRATEGY.get());
         for (var e : ws.entrySet()) {
@@ -141,5 +142,31 @@ public final class Tx implements Comparable<Tx> {
     @Override
     public int compareTo(Tx tx) {
         return Long.compare(this.readPoint, tx.readPoint);
+    }
+
+    private enum Clock {
+        INSTANCE;
+
+        private static final VarHandle GLOBAL;
+
+        static {
+            try {
+                GLOBAL = MethodHandles.lookup()
+                        .findVarHandle(Tx.Clock.class, "global", long.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
+        @SuppressWarnings({"FieldMayBeFinal", "NonFinalFieldInEnum"})
+        private volatile long global = 0L;
+
+        public long now() {
+            return global;
+        }
+
+        public long advance() {
+            return (long) GLOBAL.getAndAdd(this, 1L) + 1L;
+        }
     }
 }

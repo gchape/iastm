@@ -12,14 +12,14 @@ class RingBufferHistoryTest {
     @Test
     @DisplayName("scan returns initial value at version 0")
     void scanInitial() {
-        RingBufferHistory<String> h = new RingBufferHistory<>("init");
+        AdaptiveRingHistory<String> h = new AdaptiveRingHistory<>("init");
         assertThat(h.scan(0L)).isEqualTo("init");
     }
 
     @Test
     @DisplayName("scan returns latest value at or before readPoint")
     void scanSnapshotSemantics() {
-        RingBufferHistory<Integer> h = new RingBufferHistory<>(0);
+        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
         h.append(10, 1L);
         h.append(20, 3L);
         h.append(30, 5L);
@@ -36,7 +36,7 @@ class RingBufferHistoryTest {
     @Test
     @DisplayName("scan throws VersionEvictedException after 32 overwrites")
     void scanThrowsWhenEvicted() {
-        RingBufferHistory<Integer> h = new RingBufferHistory<>(0);
+        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
         for (int i = 1; i <= 33; i++) {
             h.append(i, i);
         }
@@ -49,7 +49,7 @@ class RingBufferHistoryTest {
     @Test
     @DisplayName("append wraps slot correctly at boundary")
     void appendWrapsAtBoundary() {
-        RingBufferHistory<Integer> h = new RingBufferHistory<>(0);
+        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
         // fill exactly 32 slots after the initial one
         for (int i = 1; i <= 32; i++) {
             h.append(i * 100, i);

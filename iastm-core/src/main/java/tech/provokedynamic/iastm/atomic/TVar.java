@@ -1,10 +1,11 @@
 package tech.provokedynamic.iastm.atomic;
 
 import lombok.EqualsAndHashCode;
-import tech.provokedynamic.iastm.clock.TVarClock;
-import tech.provokedynamic.iastm.mvcc.History;
-import tech.provokedynamic.iastm.mvcc.RingBufferHistory;
+import tech.provokedynamic.iastm.mvcc.AdaptiveHistory;
+import tech.provokedynamic.iastm.mvcc.AdaptiveRingHistory;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.concurrent.locks.ReentrantLock;
 
 @EqualsAndHashCode(of = "id")
@@ -12,11 +13,11 @@ public final class TVar<T> implements Comparable<TVar<T>> {
 
     /// Ring-buffer of up to 32 past (value, version) pairs, enabling snapshot reads
     /// without holding any lock in optimistic mode.
-    final History<T> history;
+    final AdaptiveHistory<T> history;
 
     /// Globally unique, monotonically increasing identity assigned at construction time.
     /// Used as the sort key for deadlock-free lock ordering.
-    final long id = TVarClock.INSTANCE.next();
+    final long id = Clock.INSTANCE.advance();
 
     /// Per-variable reentrant lock. Acquired eagerly in pessimistic mode (ownership
     /// stealing) and acquired at commit time in optimistic mode.
@@ -32,7 +33,7 @@ public final class TVar<T> implements Comparable<TVar<T>> {
     public TVar(T initial) {
         this.version = 0L;
         this.value = initial;
-        this.history = new RingBufferHistory<>(initial);
+        this.history = new AdaptiveRingHistory<>(initial);
     }
 
     void commit(T val, long version) {
@@ -52,5 +53,27 @@ public final class TVar<T> implements Comparable<TVar<T>> {
     @Override
     public int compareTo(TVar<T> other) {
         return Long.compare(this.id, other.id);
+    }
+
+    private enum Clock {
+        INSTANCE;
+
+        private static final VarHandle VERSION;
+
+        static {
+            try {
+                VERSION = MethodHandles.lookup()
+                        .findVarHandle(TVar.Clock.class, "version", long.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
+        @SuppressWarnings({"FieldMayBeFinal", "NonFinalFieldInEnum"})
+        private volatile long version = 0L;
+
+        public long advance() {
+            return (long) VERSION.getAndAdd(this, 1L) + 1L;
+        }
     }
 }
