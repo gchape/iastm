@@ -1,6 +1,6 @@
 package tech.provokedynamic.iastm.mvcc;
 
-public interface AdaptiveHistory<T> {
+public sealed interface AdaptiveHistory<T> permits CircularArray {
 
     T scan(long readPoint);
 

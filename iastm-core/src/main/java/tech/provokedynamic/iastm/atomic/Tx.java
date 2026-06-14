@@ -3,170 +3,60 @@ package tech.provokedynamic.iastm.atomic;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.util.*;
 
-import static tech.provokedynamic.iastm.atomic.IASTM.__STRATEGY;
+import static tech.provokedynamic.iastm.atomic.IASTM.__PROTOCOL;
+import static tech.provokedynamic.iastm.atomic.Protocol.OPTIMISTIC;
+import static tech.provokedynamic.iastm.atomic.Protocol.PESSIMISTIC_WRITE;
 
-@Slf4j
-@EqualsAndHashCode(of = "readPoint")
+@EqualsAndHashCode(of = "rv")
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
 public final class Tx implements Comparable<Tx> {
 
-    /// The global clock value sampled when this transaction attempt was created.
-    /// All snapshot reads use this timestamp to select a consistent version from
-    /// each [TVar]'s [tech.provokedynamic.iastm.mvcc.VersionHistory].
-    final long readPoint = Clock.INSTANCE.now();
+    static final Clock COMMIT_CLOCK = new Clock();
 
-    /// Read-set: maps each [TVar] to the version observed during the read.
-    /// Used by [#validateReads()] to detect concurrent writes before commit.
-    private final HashMap<TVar<?>, Long> rs = new HashMap<>();
+    final long rv = COMMIT_CLOCK.snapshot();
 
-    /// Write-set: maps each [TVar] to its pending new value, sorted by [TVar#id]
-    /// to ensure a globally consistent lock-acquisition order.
-    private final TreeMap<TVar<?>, Object> ws = new TreeMap<>();
+    private final Map<TVar<?>, Long> reads = new HashMap<>();
+    private final TreeMap<TVar<?>, Object> writes = new TreeMap<>();
 
-    /// Tracks `TVar`s whose locks were stolen by [#steal(TVar)] in pessimistic mode
-    /// so they can all be released by [#unstealAll()] on abort.
-    private final List<TVar<?>> stolen = new ArrayList<>();
+    private final List<TVar<?>> locked = new ArrayList<>();
 
     @SuppressWarnings("unchecked")
     <T> T read(TVar<T> tvar) {
-        if (ws.containsKey(tvar)) {
-            return (T) ws.get(tvar);
+        if (writes.containsKey(tvar)) {
+            return (T) writes.get(tvar);
         }
-        if (__STRATEGY.get() == IASTM.Strategy.PESSIMISTIC) {
-            rs.putIfAbsent(tvar, tvar.version);
-            return tvar.value;
+        if (isPessimistic()) {
+            return PESSIMISTIC_WRITE.INSTANCE.read(tvar, reads);
         }
-        long version = tvar.version;
-        if (version > readPoint) {
-            throw new ConcurrentModificationException();
-        }
-        if (tvar.lock.isLocked()) {
-            throw new ConcurrentModificationException();
-        }
-        T val = tvar.history.scan(readPoint);
-        if (tvar.version != version) {
-            throw new ConcurrentModificationException();
-        }
-        rs.putIfAbsent(tvar, version);
-        return val;
+        return OPTIMISTIC.INSTANCE.read(tvar, rv, reads);
     }
 
     <T> void write(TVar<T> tvar, T val) {
-        if (__STRATEGY.get() == IASTM.Strategy.PESSIMISTIC) {
-            steal(tvar);
+        if (isPessimistic()) {
+            PESSIMISTIC_WRITE.INSTANCE.write(tvar, val, writes, locked);
+        } else {
+            writes.put(tvar, val);
         }
-        ws.put(tvar, val);
     }
 
     void commit() {
-        if (ws.isEmpty()) {
-            log.debug("commit skipped — read-only tx");
-            return;
-        }
-        log.debug("commit attempt reads={} writes={}", rs.size(), ws.size());
-        if (__STRATEGY.get() == IASTM.Strategy.PESSIMISTIC) {
-            commitPessimistic();
+        if (writes.isEmpty()) return;
+        if (isPessimistic()) {
+            PESSIMISTIC_WRITE.INSTANCE.commit(reads, writes, locked);
         } else {
-            commitOptimistic();
+            OPTIMISTIC.INSTANCE.commit(reads, writes);
         }
     }
 
-    private void commitPessimistic() {
-        try {
-            validateReads();
-            applyWrites();
-        } catch (ConcurrentModificationException e) {
-            unstealAll();
-            throw e;
-        }
-        unstealAll();
-    }
-
-    private void commitOptimistic() {
-        ws.keySet().forEach(t -> t.lock.lock());
-        try {
-            validateReads();
-            applyWrites();
-        } finally {
-            ws.keySet().forEach(t -> t.lock.unlock());
-        }
-    }
-
-    private void validateReads() {
-        rs.forEach((tvar, rv) -> {
-            if (!tvar.lock.isHeldByCurrentThread() && tvar.lock.isLocked()) {
-                throw new ConcurrentModificationException();
-            }
-            if (tvar.version != rv) {
-                log.debug("read conflict tvar={} expected={} actual={}",
-                        System.identityHashCode(tvar), rv, tvar.version);
-                throw new ConcurrentModificationException();
-            }
-        });
-    }
-
-    @SuppressWarnings("unchecked")
-    private void applyWrites() {
-        long version = Clock.INSTANCE.advance();
-        log.debug("applying writes commitVersion={} count={} strategy={}",
-                version, ws.size(), __STRATEGY.get());
-        for (var e : ws.entrySet()) {
-            TVar<Object> tVar = (TVar<Object>) e.getKey();
-            Object val = e.getValue();
-            tVar.commit(val, version);
-        }
-    }
-
-    private void steal(TVar<?> tvar) {
-        if (tvar.lock.isHeldByCurrentThread()) {
-            return;
-        }
-        if (!tvar.trySteal()) {
-            unstealAll();
-            throw new ConcurrentModificationException();
-        }
-        stolen.add(tvar);
-    }
-
-    private void unstealAll() {
-        stolen.forEach(TVar::unsteal);
-        stolen.clear();
+    private boolean isPessimistic() {
+        return __PROTOCOL.get() instanceof PESSIMISTIC_WRITE;
     }
 
     @Override
     public int compareTo(Tx tx) {
-        return Long.compare(this.readPoint, tx.readPoint);
-    }
-
-    private enum Clock {
-        INSTANCE;
-
-        private static final VarHandle GLOBAL;
-
-        static {
-            try {
-                GLOBAL = MethodHandles.lookup()
-                        .findVarHandle(Tx.Clock.class, "global", long.class);
-            } catch (ReflectiveOperationException e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
-        @SuppressWarnings({"FieldMayBeFinal", "NonFinalFieldInEnum"})
-        private volatile long global = 0L;
-
-        public long now() {
-            return global;
-        }
-
-        public long advance() {
-            return (long) GLOBAL.getAndAdd(this, 1L) + 1L;
-        }
+        return Long.compare(this.rv, tx.rv);
     }
 }

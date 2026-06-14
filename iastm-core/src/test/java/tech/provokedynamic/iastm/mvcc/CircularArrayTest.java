@@ -7,19 +7,19 @@ import tech.provokedynamic.iastm.exception.VersionEvictedException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class RingBufferHistoryTest {
+class CircularArrayTest {
 
     @Test
     @DisplayName("scan returns initial value at version 0")
     void scanInitial() {
-        AdaptiveRingHistory<String> h = new AdaptiveRingHistory<>("init");
+        CircularArray<String> h = new CircularArray<>("init");
         assertThat(h.scan(0L)).isEqualTo("init");
     }
 
     @Test
     @DisplayName("scan returns latest value at or before readPoint")
     void scanSnapshotSemantics() {
-        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
+        CircularArray<Integer> h = new CircularArray<>(0);
         h.append(10, 1L);
         h.append(20, 3L);
         h.append(30, 5L);
@@ -36,7 +36,7 @@ class RingBufferHistoryTest {
     @Test
     @DisplayName("scan throws VersionEvictedException after 32 overwrites")
     void scanThrowsWhenEvicted() {
-        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
+        CircularArray<Integer> h = new CircularArray<>(0);
         for (int i = 1; i <= 33; i++) {
             h.append(i, i);
         }
@@ -49,7 +49,7 @@ class RingBufferHistoryTest {
     @Test
     @DisplayName("append wraps slot correctly at boundary")
     void appendWrapsAtBoundary() {
-        AdaptiveRingHistory<Integer> h = new AdaptiveRingHistory<>(0);
+        CircularArray<Integer> h = new CircularArray<>(0);
         // fill exactly 32 slots after the initial one
         for (int i = 1; i <= 32; i++) {
             h.append(i * 100, i);
